@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import wizardMascot from "@/assets/wizard-mascot.png";
+import wizardVideo from "@/assets/magical-wizard.mp4"; // adjust the path
 
 
 
@@ -28,8 +29,6 @@ interface PresentationData {
   fileName: string;
   totalSlides: number;
 }
-
-
 
 const PresentationPage = () => {
   const [presentationData, setPresentationData] = useState<PresentationData | null>(null);
@@ -43,6 +42,21 @@ const PresentationPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [animatedSubtitle, setAnimatedSubtitle] = useState("");
+
+  const preloadImages = (slides) => {
+  slides.forEach(slide => {
+    const img = new Image();
+    img.src = slide.slideUrl;
+  });
+};
+
+useEffect(() => {
+  if (presentationData) {
+    preloadImages(presentationData.slides);
+  }
+}, [presentationData]);
+
 
   useEffect(() => {
     const data = localStorage.getItem('presentationData');
@@ -60,19 +74,47 @@ const PresentationPage = () => {
     }
   }, [navigate, toast]);
 
+  // const handlePlayPause = () => {
+  //   setIsPlaying(!isPlaying);
+  //   if (!isPlaying) {
+  //     setCurrentSubtitle(`Playing slide ${currentSlide} of ${presentationData?.totalSlides || 5}...`);
+  //   } else {
+  //     setCurrentSubtitle("Presentation paused. Click play to continue.");
+  //   }
+  // };
+
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-    if (!isPlaying) {
-      setCurrentSubtitle(`Playing slide ${currentSlide} of ${presentationData?.totalSlides || 5}...`);
-    } else {
-      setCurrentSubtitle("Presentation paused. Click play to continue.");
-    }
-  };
+  setIsPlaying(!isPlaying);
+
+  if (!isPlaying) {
+    // Fetch subtitle for the current slide
+    const subtitle = presentationData?.slides?.[currentSlide - 1]?.currentSubtitle || "";
+    setCurrentSubtitle(subtitle);
+  } else {
+    setCurrentSubtitle("~Presentation paused. Click play to continue.");
+  }
+};
+
+useEffect(() => {
+  if (!currentSubtitle) return;
+
+  setAnimatedSubtitle(""); // reset before typing
+  let index = 0;
+
+  const interval = setInterval(() => {
+    setAnimatedSubtitle((prev) => prev + currentSubtitle.charAt(index));
+    index++;
+    if (index >= currentSubtitle.length) clearInterval(interval);
+  }, 60);
+
+  return () => clearInterval(interval); // clean previous interval
+}, [currentSubtitle]);
+
 
   const handleNextSlide = () => {
     if (currentSlide < (presentationData?.totalSlides || 5)) {
       setCurrentSlide(currentSlide + 1);
-      setCurrentSubtitle(`Now showing slide ${currentSlide + 1}`);
+      setCurrentSubtitle(`~Now showing slide ${currentSlide + 1}`);
     }
   };
 
@@ -86,7 +128,7 @@ const PresentationPage = () => {
   const handleRestart = () => {
     setCurrentSlide(1);
     setIsPlaying(false);
-    setCurrentSubtitle("Presentation restarted. Ready to begin from the first slide.");
+    setCurrentSubtitle("~Presentation restarted. Ready to begin from the first slide.");
   };
 
   const handleNewPresentation = () => {
@@ -148,20 +190,23 @@ const PresentationPage = () => {
     }
   };
 useEffect(() => {
-    if (!audioRef.current) return;
+  if (!audioRef.current || !presentationData) return;
 
-    audioRef.current.load(); // reload current slide audio
+  audioRef.current.load(); // reload current slide audio
 
-    if (isPlaying) {
-      audioRef.current
-        .play()
-        .catch((err) => console.log("Playback error:", err));
-      setCurrentSubtitle(`Playing slide ${currentSlide} of ${presentationData?.totalSlides || 5}...`);
-    } else {
-      audioRef.current.pause();
-      setCurrentSubtitle("Presentation paused. Click play to continue.");
-    }
-  }, [currentSlide, isPlaying, presentationData]);
+  const subtitle = presentationData.slides[currentSlide - 1]?.currentSubtitle || "";
+
+  if (isPlaying) {
+    audioRef.current
+      .play()
+      .catch((err) => console.log("Playback error:", err));
+    setCurrentSubtitle(subtitle); // show actual slide subtitle
+  } else {
+    audioRef.current.pause();
+    setCurrentSubtitle("Presentation paused. Click play to continue.");
+  }
+}, [currentSlide, isPlaying, presentationData]);
+
   if (!presentationData) {
     return (
       <div className="min-h-screen gradient-hero flex items-center justify-center">
@@ -181,10 +226,10 @@ useEffect(() => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Badge variant="secondary" className="px-3 py-1">
-                Slide {currentSlide} of {presentationData.totalSlides}
+                Slide {currentSlide} of {presentationData.totalSlides} 5
               </Badge>
               <div className="text-sm text-muted-foreground">
-                Voice: {presentationData.voiceStyle} | File: {presentationData.fileName}
+                Voice: {presentationData.voiceStyle} | Playing slide {currentSlide} of {presentationData?.totalSlides || 5}
               </div>
             </div>
             <Button
@@ -206,21 +251,33 @@ useEffect(() => {
             <Card className="p-6 gradient-card shadow-card border-0">
               <div className="text-center space-y-4">
                 <div className="relative">
-                  <img
-                    src={wizardMascot}
-                    alt="AI Wizard"
-                    className="w-full max-w-xs mx-auto animate-float"
-                  />
-                  {isPlaying && (
-                    <div className="absolute top-4 right-4">
-                      <Volume2 className="w-6 h-6 text-primary animate-pulse" />
-                    </div>
-                  )}
-                </div>
+  {isPlaying ? (
+    <video
+      src={wizardVideo} // your local mp4 path
+      autoPlay
+      loop
+      muted
+      className="w-full max-w-xs mx-auto rounded-lg shadow-lg"
+    />
+  ) : (
+    <img
+      src={wizardMascot}
+      alt="AI Wizard"
+      className="w-full max-w-xs mx-auto animate-float rounded-lg shadow-lg"
+    />
+  )}
+
+  {isPlaying && (
+    <div className="absolute top-1 right-2">
+      <Volume2 className="w-6 h-6 text-primary animate-pulse" />
+    </div>
+  )}
+</div>
+
 
                 <div className="space-y-3">
                   <h3 className="text-lg font-semibold text-foreground">
-                    Your AI Presenter
+                    Your AI  Magical Presenter
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {isPlaying ? "Currently presenting..." : "Ready to present when you are!"}
@@ -290,18 +347,18 @@ useEffect(() => {
 
 
             {/* Subtitles */}
-            // <Card className="p-4 bg-black/80 backdrop-blur-sm border-0">
-            //   <p className="text-white text-center text-lg leading-relaxed">
-            //     {currentSubtitle}
-            //   </p>
-            // </Card>
+            <Card className="p-4 bg-black/80 backdrop-blur-sm border-0">
+              <p className="text-white text-center text-lg leading-relaxed">
+                 {animatedSubtitle}
+              </p>
+            </Card>
           </div>
         </div>
 
         {/* Q&A Panel Toggle */}
         <Button
           onClick={() => setShowQA(!showQA)}
-          className="fixed bottom-6 right-6 rounded-full w-14 h-14 gradient-magical border-0 shadow-magical hover:shadow-glow transition-magical"
+          className="fixed bottom-6 left-6 rounded-full w-14 h-14 gradient-magical border-0 shadow-magical hover:shadow-glow transition-magical"
         >
           {showQA ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
         </Button>
@@ -310,7 +367,7 @@ useEffect(() => {
         {showQA && (
           <Card className="fixed bottom-24 right-6 w-96 max-w-[calc(100vw-3rem)] gradient-card shadow-magical border-0 max-h-96 flex flex-col">
             <div className="p-4 border-b border-border/20">
-              <h4 className="font-semibold text-foreground">Live Q&A</h4>
+              <h4 className="font-semibold text-foreground">Live Q&A with AI Magical Wizard!</h4>
               <p className="text-sm text-muted-foreground">Ask questions about the presentation</p>
             </div>
 

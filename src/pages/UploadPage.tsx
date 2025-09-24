@@ -70,7 +70,7 @@ const UploadPage = () => {
       formData.append("voiceStyle", voiceStyle);
       formData.append("file", file);
 
-      const response = await fetch("https://bot.csautomaition.com/webhook/start-presentation", {
+      const response = await fetch("https://bot.csautomaition.com/webhook/start-presenting", {
         method: "POST",
         body: formData,
       });
